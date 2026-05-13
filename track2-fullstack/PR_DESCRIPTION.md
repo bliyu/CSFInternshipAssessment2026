@@ -33,7 +33,7 @@ Weight History after logging a measurement, showing the latest-weight summary, h
 
 ### Optional: Weight History Empty State
 
-![Weight history empty state](./screenshots/4.png)
+![Weight history empty state](./screenshots/5.png)
 
 Weight History empty state before any measurements are recorded.
 
