@@ -30,7 +30,7 @@ after(async () => {
 });
 
 function seedTestData() {
-  db.exec('DELETE FROM health_events; DELETE FROM animals; DELETE FROM paddocks;');
+  db.exec('DELETE FROM animal_weights; DELETE FROM health_events; DELETE FROM animals; DELETE FROM paddocks;');
 
   const northId = db.prepare(
     'INSERT INTO paddocks (name, capacity, animal_count) VALUES (?, ?, 0)'
@@ -137,4 +137,74 @@ test('PUT /api/animals/:id moving Bella updates paddock animal counts', async ()
   assert.equal(body.paddock_id, southPaddock.id);
   assert.equal(updatedNorthPaddock.animal_count, northPaddock.animal_count - 1);
   assert.equal(updatedSouthPaddock.animal_count, southPaddock.animal_count + 1);
+});
+
+test('POST /api/animals/:id/weights creates a weight record and returns 201', async () => {
+  seedTestData();
+
+  const bella = db.prepare('SELECT * FROM animals WHERE name = ?').get('Bella');
+  const { status, body } = await post(`/animals/${bella.id}/weights`, {
+    weight_kg: 45.2,
+    date: '2024-11-15',
+    notes: 'Post-shearing weigh-in',
+  });
+
+  assert.equal(status, 201);
+  assert.equal(body.animal_id, bella.id);
+  assert.equal(body.weight_kg, 45.2);
+  assert.equal(body.date, '2024-11-15');
+  assert.equal(body.notes, 'Post-shearing weigh-in');
+});
+
+test('POST /api/animals/:id/weights returns 422 when weight_kg is missing', async () => {
+  seedTestData();
+
+  const bella = db.prepare('SELECT * FROM animals WHERE name = ?').get('Bella');
+  const { status } = await post(`/animals/${bella.id}/weights`, {
+    date: '2024-11-15',
+  });
+
+  assert.equal(status, 422);
+});
+
+test('POST /api/animals/:id/weights returns 422 when weight_kg is non-positive', async () => {
+  seedTestData();
+
+  const bella = db.prepare('SELECT * FROM animals WHERE name = ?').get('Bella');
+  const { status } = await post(`/animals/${bella.id}/weights`, {
+    weight_kg: 0,
+    date: '2024-11-15',
+  });
+
+  assert.equal(status, 422);
+});
+
+test('POST /api/animals/:id/weights returns 404 when the animal does not exist', async () => {
+  seedTestData();
+
+  const { status } = await post('/animals/999999/weights', {
+    weight_kg: 45.2,
+    date: '2024-11-15',
+  });
+
+  assert.equal(status, 404);
+});
+
+test('GET /api/animals/:id/weights returns records ordered by date descending', async () => {
+  seedTestData();
+
+  const bella = db.prepare('SELECT * FROM animals WHERE name = ?').get('Bella');
+  db.prepare(
+    'INSERT INTO animal_weights (animal_id, weight_kg, date, notes) VALUES (?, ?, ?, ?)'
+  ).run(bella.id, 43.1, '2024-10-01', 'Early October');
+  db.prepare(
+    'INSERT INTO animal_weights (animal_id, weight_kg, date, notes) VALUES (?, ?, ?, ?)'
+  ).run(bella.id, 45.2, '2024-11-15', 'Post-shearing weigh-in');
+
+  const { status, body } = await get(`/animals/${bella.id}/weights`);
+
+  assert.equal(status, 200);
+  assert.equal(body.length, 2);
+  assert.equal(body[0].date, '2024-11-15');
+  assert.equal(body[1].date, '2024-10-01');
 });
