@@ -12,7 +12,7 @@ This pull request completes the FarmTracker Fullstack assessment scope by:
 
 - auditing the inherited application and documenting priorities in `AUDIT.md`
 - fixing a paddock count consistency bug when animals move between paddocks
-- implementing backend weight tracking with validation and integration tests
+- implementing the full weight logging feature from `TODO.md` across the backend and frontend
 - adding the frontend Weight History section to the animal detail page
 - documenting the main architectural concern and a concrete next-step plan
 - adding a short retrospective on trade-offs and follow-up work
@@ -54,6 +54,8 @@ I also called out inconsistent validation and the growing concentration of busin
 - Added `animal_weights` table with a positive-weight database check.
 - Added `POST /api/animals/:id/weights`.
 - Added `GET /api/animals/:id/weights`.
+- Added validation so `weight_kg` must be present, numeric, and positive, and `date` must be present.
+- Returns `404` when the animal does not exist and `422` for invalid weight input.
 - Added integration tests covering success, validation failures, missing animal handling, and descending date ordering.
 
 ### Frontend
@@ -62,6 +64,15 @@ I also called out inconsistent validation and the growing concentration of busin
 - Displays the latest recorded weight prominently.
 - Lists all weight entries in a table.
 - Adds a form to submit new weight records and reload the history after save.
+
+## TODO Acceptance Criteria Coverage
+
+- `POST /api/animals/:id/weights` creates a weight record and returns `201`.
+- `POST /api/animals/:id/weights` returns `422` when `weight_kg` is missing or non-positive.
+- `POST /api/animals/:id/weights` returns `404` when the animal does not exist.
+- `GET /api/animals/:id/weights` returns all records ordered by date descending.
+- The animal detail page displays weight history, highlights the latest recorded weight, and allows logging a new measurement.
+- Backend tests cover the happy path and the required validation and error cases.
 
 ## Setup And Run
 
