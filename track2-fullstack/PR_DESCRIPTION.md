@@ -21,13 +21,13 @@ This pull request completes the FarmTracker Fullstack assessment scope by:
 
 ### Animal Detail Page Context
 
-![Animal detail page context](./screenshots/5.png)
+![Animal detail page context](./screenshots/b44.png)
 
 Animal detail page showing the existing health event workflow and the page context where weight tracking was added.
 
 ### Weight History With Recorded Measurement
 
-![Weight history with recorded measurement](./screenshots/b44.png)
+![Weight history with recorded measurement](./screenshots/w_history.png)
 
 Weight History after logging a measurement, showing the latest-weight summary, history table, and entry form.
 
