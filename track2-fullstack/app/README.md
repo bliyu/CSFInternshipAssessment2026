@@ -17,6 +17,12 @@ npm start
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+Useful pages:
+
+- `http://localhost:3000/`
+- `http://localhost:3000/animals.html`
+- `http://localhost:3000/animal-detail.html?id=1`
+
 ## Running tests
 
 The test suite starts its own server and temporary SQLite database:
@@ -62,3 +68,19 @@ app/
 | DELETE | /api/animals/:id | Delete an animal |
 | GET | /api/animals/:id/health-events | List health events |
 | POST | /api/animals/:id/health-events | Log a health event |
+| GET | /api/animals/:id/weights | List weight history ordered by date descending |
+| POST | /api/animals/:id/weights | Log a weight measurement |
+
+## Weight tracking
+
+The animal detail page includes a Weight History section that:
+
+- shows the latest recorded weight
+- lists all recorded weights for the animal
+- allows logging a new weight measurement from the browser
+
+Weight API validation rules:
+
+- `weight_kg` must be a positive number
+- `date` is required
+- requests for unknown animals return `404`
