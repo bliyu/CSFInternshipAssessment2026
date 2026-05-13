@@ -69,6 +69,15 @@ async function post(path, body) {
   return { status: res.status, body: await res.json() };
 }
 
+async function put(path, body) {
+  const res = await fetch(baseUrl + path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return { status: res.status, body: await res.json() };
+}
+
 test('GET /api/paddocks returns an array', async () => {
   const { status, body } = await get('/paddocks');
   assert.equal(status, 200);
@@ -107,4 +116,25 @@ test('POST /api/animals/:id/health-events creates an event', async () => {
   assert.equal(status, 201);
   assert.equal(body.event_type, 'checkup');
   assert.equal(body.animal_id, id);
+});
+
+test('PUT /api/animals/:id moving Bella updates paddock animal counts', async () => {
+  seedTestData();
+
+  const northPaddock = db.prepare('SELECT * FROM paddocks WHERE name = ?').get('North Paddock');
+  const southPaddock = db.prepare('SELECT * FROM paddocks WHERE name = ?').get('South Paddock');
+  const bella = db.prepare('SELECT * FROM animals WHERE name = ?').get('Bella');
+
+  const { status, body } = await put(`/animals/${bella.id}`, {
+    paddock_id: southPaddock.id,
+  });
+
+  const updatedNorthPaddock = db.prepare('SELECT * FROM paddocks WHERE id = ?').get(northPaddock.id);
+  const updatedSouthPaddock = db.prepare('SELECT * FROM paddocks WHERE id = ?').get(southPaddock.id);
+
+  assert.equal(status, 200);
+  assert.equal(body.id, bella.id);
+  assert.equal(body.paddock_id, southPaddock.id);
+  assert.equal(updatedNorthPaddock.animal_count, northPaddock.animal_count - 1);
+  assert.equal(updatedSouthPaddock.animal_count, southPaddock.animal_count + 1);
 });
