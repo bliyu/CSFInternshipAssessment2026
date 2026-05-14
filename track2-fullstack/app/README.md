@@ -38,24 +38,24 @@ npm test
 
 ## Project structure
 
-```
+```text
 app/
-├── backend/
-│   ├── server.js          # Express app entry point
-│   ├── db.js              # Database connection and schema
-│   ├── routes/
-│   │   ├── animals.js     # Animal endpoints
-│   │   └── paddocks.js    # Paddock endpoints
-│   ├── test/
-│   │   └── api.test.js    # Integration tests
-│   ├── seed.js            # Seed script (run once after install)
-│   └── package.json
-└── frontend/
-    ├── index.html         # Paddocks overview
-    ├── animals.html       # Animal list
-    ├── animal-detail.html # Animal detail, health events, and weight history
-    ├── app.js             # Shared fetch utilities
-    └── styles.css
+- backend/
+  - server.js          # Express app entry point
+  - db.js              # Database connection and schema
+  - routes/
+    - animals.js       # Animal endpoints
+    - paddocks.js      # Paddock endpoints
+  - test/
+    - api.test.js      # Integration tests
+  - seed.js            # Seed script (run once after install)
+  - package.json
+- frontend/
+  - index.html         # Paddocks overview
+  - animals.html       # Animal list
+  - animal-detail.html # Animal detail, health events, and weight history
+  - app.js             # Shared fetch utilities
+  - styles.css
 ```
 
 ## API reference
