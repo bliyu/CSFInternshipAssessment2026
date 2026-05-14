@@ -92,6 +92,19 @@ test('GET /api/animals returns animals with latest_health_event field', async ()
   assert.ok('latest_health_event' in body[0]);
 });
 
+test('GET /api/animals applies page as a page index instead of a raw row offset', async () => {
+  seedTestData();
+
+  const { status: firstStatus, body: firstPage } = await get('/animals?page=0&limit=1');
+  const { status: secondStatus, body: secondPage } = await get('/animals?page=1&limit=1');
+
+  assert.equal(firstStatus, 200);
+  assert.equal(secondStatus, 200);
+  assert.equal(firstPage.length, 1);
+  assert.equal(secondPage.length, 1);
+  assert.notEqual(firstPage[0].id, secondPage[0].id);
+});
+
 test('GET /api/animals/:id returns a single animal', async () => {
   const { body: animals } = await get('/animals?page=0&limit=1');
   const id = animals[0].id;
@@ -137,6 +150,42 @@ test('PUT /api/animals/:id moving Bella updates paddock animal counts', async ()
   assert.equal(body.paddock_id, southPaddock.id);
   assert.equal(updatedNorthPaddock.animal_count, northPaddock.animal_count - 1);
   assert.equal(updatedSouthPaddock.animal_count, southPaddock.animal_count + 1);
+});
+
+test('PUT /api/animals/:id returns 404 when moving an animal to a missing paddock', async () => {
+  seedTestData();
+
+  const northPaddock = db.prepare('SELECT * FROM paddocks WHERE name = ?').get('North Paddock');
+  const bella = db.prepare('SELECT * FROM animals WHERE name = ?').get('Bella');
+
+  const { status, body } = await put(`/animals/${bella.id}`, {
+    paddock_id: 999999,
+  });
+
+  const unchangedBella = db.prepare('SELECT * FROM animals WHERE id = ?').get(bella.id);
+  const unchangedNorthPaddock = db.prepare('SELECT * FROM paddocks WHERE id = ?').get(northPaddock.id);
+
+  assert.equal(status, 404);
+  assert.equal(body.error, 'Paddock not found');
+  assert.equal(unchangedBella.paddock_id, northPaddock.id);
+  assert.equal(unchangedNorthPaddock.animal_count, northPaddock.animal_count);
+});
+
+test('POST /api/animals returns 404 when creating an animal in a missing paddock', async () => {
+  seedTestData();
+
+  const animalCountBefore = db.prepare('SELECT COUNT(*) AS count FROM animals').get().count;
+  const { status, body } = await post('/animals', {
+    name: 'Tilly',
+    tag_number: 'TAG-404',
+    breed: 'Merino',
+    paddock_id: 999999,
+  });
+  const animalCountAfter = db.prepare('SELECT COUNT(*) AS count FROM animals').get().count;
+
+  assert.equal(status, 404);
+  assert.equal(body.error, 'Paddock not found');
+  assert.equal(animalCountAfter, animalCountBefore);
 });
 
 test('POST /api/animals/:id/weights creates a weight record and returns 201', async () => {

@@ -3,12 +3,15 @@ const router = express.Router();
 const { db } = require('../db');
 
 router.get('/', (req, res) => {
-  const page = parseInt(req.query.page) || 0;
-  const limit = parseInt(req.query.limit) || 10;
+  const parsedPage = Number.parseInt(req.query.page, 10);
+  const parsedLimit = Number.parseInt(req.query.limit, 10);
+  const page = Number.isInteger(parsedPage) && parsedPage >= 0 ? parsedPage : 0;
+  const limit = Number.isInteger(parsedLimit) && parsedLimit > 0 ? parsedLimit : 10;
+  const offset = page * limit;
 
   const animals = db.prepare(
     'SELECT * FROM animals LIMIT ? OFFSET ?'
-  ).all(limit, page);
+  ).all(limit, offset);
 
   const result = animals.map(animal => {
     const latestEvent = db.prepare(`
@@ -31,6 +34,11 @@ router.post('/', (req, res) => {
   }
 
   if (paddock_id) {
+    const paddock = db.prepare('SELECT id FROM paddocks WHERE id = ?').get(paddock_id);
+    if (!paddock) {
+      return res.status(404).json({ error: 'Paddock not found' });
+    }
+
     db.prepare(
       'UPDATE paddocks SET animal_count = animal_count + 1 WHERE id = ?'
     ).run(paddock_id);
@@ -63,6 +71,13 @@ router.put('/:id', (req, res) => {
   };
 
   if (updates.paddock_id !== animal.paddock_id) {
+    if (updates.paddock_id) {
+      const paddock = db.prepare('SELECT id FROM paddocks WHERE id = ?').get(updates.paddock_id);
+      if (!paddock) {
+        return res.status(404).json({ error: 'Paddock not found' });
+      }
+    }
+
     if (animal.paddock_id) {
       db.prepare(
         'UPDATE paddocks SET animal_count = animal_count - 1 WHERE id = ?'
