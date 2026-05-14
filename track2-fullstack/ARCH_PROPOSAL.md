@@ -41,6 +41,8 @@ The `updateAnimal` service should own paddock reassignment behavior so there is 
 
 ## Transaction Boundary
 
+The recent bug-fix work already wraps animal create/update writes in small transactions at the route layer. As part of the service extraction, I would keep that protection but move transaction ownership out of Express handlers.
+
 The paddock move logic should execute inside a database transaction:
 
 - read current animal
@@ -48,7 +50,7 @@ The paddock move logic should execute inside a database transaction:
 - increase new paddock count when needed
 - update the animal row
 
-That would protect the app from partial updates if any step fails.
+That protects the app from partial updates if any step fails and keeps the consistency rule close to the business operation instead of scattering it across handlers.
 
 ## Why I Chose a Proposal Instead of a Full Refactor
 

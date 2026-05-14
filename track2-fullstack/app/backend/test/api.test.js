@@ -84,6 +84,21 @@ test('GET /api/paddocks returns an array', async () => {
   assert.ok(Array.isArray(body));
 });
 
+test('POST /api/paddocks returns 422 for a non-positive capacity', async () => {
+  seedTestData();
+
+  const paddockCountBefore = db.prepare('SELECT COUNT(*) AS count FROM paddocks').get().count;
+  const { status, body } = await post('/paddocks', {
+    name: 'Overflow Yard',
+    capacity: -5,
+  });
+  const paddockCountAfter = db.prepare('SELECT COUNT(*) AS count FROM paddocks').get().count;
+
+  assert.equal(status, 422);
+  assert.equal(body.error, 'capacity must be a positive integer');
+  assert.equal(paddockCountAfter, paddockCountBefore);
+});
+
 test('GET /api/animals returns animals with latest_health_event field', async () => {
   const { status, body } = await get('/animals?page=0&limit=5');
   assert.equal(status, 200);
@@ -156,6 +171,7 @@ test('PUT /api/animals/:id returns 404 when moving an animal to a missing paddoc
   seedTestData();
 
   const northPaddock = db.prepare('SELECT * FROM paddocks WHERE name = ?').get('North Paddock');
+  const southPaddock = db.prepare('SELECT * FROM paddocks WHERE name = ?').get('South Paddock');
   const bella = db.prepare('SELECT * FROM animals WHERE name = ?').get('Bella');
 
   const { status, body } = await put(`/animals/${bella.id}`, {
@@ -164,16 +180,20 @@ test('PUT /api/animals/:id returns 404 when moving an animal to a missing paddoc
 
   const unchangedBella = db.prepare('SELECT * FROM animals WHERE id = ?').get(bella.id);
   const unchangedNorthPaddock = db.prepare('SELECT * FROM paddocks WHERE id = ?').get(northPaddock.id);
+  const unchangedSouthPaddock = db.prepare('SELECT * FROM paddocks WHERE id = ?').get(southPaddock.id);
 
   assert.equal(status, 404);
   assert.equal(body.error, 'Paddock not found');
   assert.equal(unchangedBella.paddock_id, northPaddock.id);
   assert.equal(unchangedNorthPaddock.animal_count, northPaddock.animal_count);
+  assert.equal(unchangedSouthPaddock.animal_count, southPaddock.animal_count);
 });
 
 test('POST /api/animals returns 404 when creating an animal in a missing paddock', async () => {
   seedTestData();
 
+  const northPaddock = db.prepare('SELECT * FROM paddocks WHERE name = ?').get('North Paddock');
+  const southPaddock = db.prepare('SELECT * FROM paddocks WHERE name = ?').get('South Paddock');
   const animalCountBefore = db.prepare('SELECT COUNT(*) AS count FROM animals').get().count;
   const { status, body } = await post('/animals', {
     name: 'Tilly',
@@ -182,10 +202,57 @@ test('POST /api/animals returns 404 when creating an animal in a missing paddock
     paddock_id: 999999,
   });
   const animalCountAfter = db.prepare('SELECT COUNT(*) AS count FROM animals').get().count;
+  const unchangedNorthPaddock = db.prepare('SELECT * FROM paddocks WHERE id = ?').get(northPaddock.id);
+  const unchangedSouthPaddock = db.prepare('SELECT * FROM paddocks WHERE id = ?').get(southPaddock.id);
 
   assert.equal(status, 404);
   assert.equal(body.error, 'Paddock not found');
   assert.equal(animalCountAfter, animalCountBefore);
+  assert.equal(unchangedNorthPaddock.animal_count, northPaddock.animal_count);
+  assert.equal(unchangedSouthPaddock.animal_count, southPaddock.animal_count);
+});
+
+test('POST /api/animals with a duplicate tag_number does not change paddock animal_count', async () => {
+  seedTestData();
+
+  const northPaddock = db.prepare('SELECT * FROM paddocks WHERE name = ?').get('North Paddock');
+
+  const { status, body } = await post('/animals', {
+    name: 'Tilly',
+    tag_number: 'TAG-001',
+    breed: 'Merino',
+    paddock_id: northPaddock.id,
+  });
+
+  const unchangedNorthPaddock = db.prepare('SELECT * FROM paddocks WHERE id = ?').get(northPaddock.id);
+
+  assert.equal(status, 409);
+  assert.equal(body.error, 'tag_number must be unique');
+  assert.equal(unchangedNorthPaddock.animal_count, northPaddock.animal_count);
+});
+
+test('PUT /api/animals/:id with a duplicate tag_number does not change paddock animal counts', async () => {
+  seedTestData();
+
+  const northPaddock = db.prepare('SELECT * FROM paddocks WHERE name = ?').get('North Paddock');
+  const southPaddock = db.prepare('SELECT * FROM paddocks WHERE name = ?').get('South Paddock');
+  const bella = db.prepare('SELECT * FROM animals WHERE name = ?').get('Bella');
+
+  const { status, body } = await put(`/animals/${bella.id}`, {
+    tag_number: 'TAG-002',
+    paddock_id: southPaddock.id,
+  });
+
+  const unchangedBella = db.prepare('SELECT * FROM animals WHERE id = ?').get(bella.id);
+  const unchangedNorthPaddock = db.prepare('SELECT * FROM paddocks WHERE id = ?').get(northPaddock.id);
+  const unchangedSouthPaddock = db.prepare('SELECT * FROM paddocks WHERE id = ?').get(southPaddock.id);
+
+  assert.equal(status, 409);
+  assert.equal(body.error, 'tag_number must be unique');
+  assert.equal(unchangedBella.tag_number, bella.tag_number);
+  assert.equal(unchangedBella.paddock_id, bella.paddock_id);
+  assert.equal(unchangedNorthPaddock.animal_count, northPaddock.animal_count);
+  assert.equal(unchangedSouthPaddock.animal_count, southPaddock.animal_count);
 });
 
 test('POST /api/animals/:id/weights creates a weight record and returns 201', async () => {

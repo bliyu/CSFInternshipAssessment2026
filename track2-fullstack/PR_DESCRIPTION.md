@@ -13,6 +13,7 @@ This pull request completes the FarmTracker Fullstack assessment scope by:
 - auditing the inherited application and documenting priorities in `AUDIT.md`
 - fixing a paddock count consistency bug when animals move between paddocks
 - fixing animal list pagination so page-based navigation no longer overlaps records between pages
+- tightening backend write safety and validation around paddock and animal updates
 - implementing the full weight logging feature from `TODO.md` across the backend and frontend
 - adding the frontend Weight History section to the animal detail page
 - improving the animal detail experience with readable date formatting and inline success/error feedback
@@ -52,6 +53,8 @@ I also called out inconsistent validation and the growing concentration of busin
 - Updated `PUT /api/animals/:id` so moving an animal between paddocks decrements the old paddock count and increments the new paddock count only when the paddock assignment actually changes.
 - Corrected `GET /api/animals` pagination so `page` behaves as a page index rather than a raw database row offset.
 - Added a missing-paddock guard when creating or moving animals so invalid paddock references return `404` instead of causing inconsistent state.
+- Rejected non-positive paddock capacities in `POST /api/paddocks` so obviously invalid enclosure data does not enter the system.
+- Wrapped multi-step animal create/update writes in small SQLite transactions so partial failures do not leave paddock counts out of sync.
 
 ### Weight Tracking API
 
@@ -113,7 +116,7 @@ npm test
 
 Observed result:
 
-- `14/14` tests passing with the backend integration suite
+- `17/17` tests passing with the backend integration suite
 
 ## Trade-Offs
 
@@ -125,5 +128,5 @@ Observed result:
 ## What I'd Do Next
 
 - Move animal business rules out of the route file and into a service layer.
-- Wrap multi-step state changes such as paddock reassignment in explicit database transactions.
+- Extend transaction coverage to animal deletion and any future multi-table write paths beyond the current create/update flow.
 - Add frontend tests around the animal detail workflow if the app grows beyond its current static-HTML scope.

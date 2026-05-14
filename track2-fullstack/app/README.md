@@ -9,7 +9,7 @@ A livestock record management application for tracking animals, paddock assignme
 ## Setup
 
 ```bash
-cd backend
+cd track2-fullstack/app/backend
 npm install
 node seed.js
 npm start
@@ -25,14 +25,14 @@ Useful pages:
 - `http://localhost:3000/animals.html`
 - `http://localhost:3000/animal-detail.html?id=1` (health events and weight history)
 
-To reset the local sample data at any point, run `node seed.js` again from `backend/`.
+To reset the local sample data at any point, run `node seed.js` again from `track2-fullstack/app/backend/`.
 
 ## Running tests
 
 The test suite starts its own server and temporary SQLite database:
 
 ```bash
-cd backend
+cd track2-fullstack/app/backend
 npm test
 ```
 
@@ -53,7 +53,7 @@ app/
 └── frontend/
     ├── index.html         # Paddocks overview
     ├── animals.html       # Animal list
-    ├── animal-detail.html # Animal detail and health events
+    ├── animal-detail.html # Animal detail, health events, and weight history
     ├── app.js             # Shared fetch utilities
     └── styles.css
 ```
@@ -89,4 +89,4 @@ Weight API validation rules:
 - `date` is required
 - requests for unknown animals return `404`
 
-SQLite database files are generated locally during development and are intentionally not tracked in git.
+SQLite database files and local backend log files are generated during development and are intentionally not tracked in git.

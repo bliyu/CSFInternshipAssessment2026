@@ -2,6 +2,42 @@ const express = require('express');
 const router = express.Router();
 const { db } = require('../db');
 
+function createHttpError(status, message) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+}
+
+function runInTransaction(work) {
+  db.exec('BEGIN');
+
+  try {
+    const result = work();
+    db.exec('COMMIT');
+    return result;
+  } catch (error) {
+    try {
+      db.exec('ROLLBACK');
+    } catch {
+      // Ignore rollback failures after the original error.
+    }
+
+    throw error;
+  }
+}
+
+function sendWriteError(res, error, fallbackMessage) {
+  if (error?.status) {
+    return res.status(error.status).json({ error: error.message });
+  }
+
+  if (typeof error?.message === 'string' && error.message.includes('UNIQUE constraint failed: animals.tag_number')) {
+    return res.status(409).json({ error: 'tag_number must be unique' });
+  }
+
+  return res.status(500).json({ error: fallbackMessage });
+}
+
 router.get('/', (req, res) => {
   const parsedPage = Number.parseInt(req.query.page, 10);
   const parsedLimit = Number.parseInt(req.query.limit, 10);
@@ -33,23 +69,34 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: 'name and tag_number are required' });
   }
 
-  if (paddock_id) {
-    const paddock = db.prepare('SELECT id FROM paddocks WHERE id = ?').get(paddock_id);
-    if (!paddock) {
-      return res.status(404).json({ error: 'Paddock not found' });
-    }
+  const nextPaddockId = paddock_id ?? null;
 
-    db.prepare(
-      'UPDATE paddocks SET animal_count = animal_count + 1 WHERE id = ?'
-    ).run(paddock_id);
+  try {
+    const animal = runInTransaction(() => {
+      if (nextPaddockId !== null) {
+        const paddock = db.prepare('SELECT id FROM paddocks WHERE id = ?').get(nextPaddockId);
+        if (!paddock) {
+          throw createHttpError(404, 'Paddock not found');
+        }
+      }
+
+      const result = db.prepare(
+        'INSERT INTO animals (name, tag_number, breed, date_of_birth, paddock_id) VALUES (?, ?, ?, ?, ?)'
+      ).run(name, tag_number, breed ?? null, date_of_birth ?? null, nextPaddockId);
+
+      if (nextPaddockId !== null) {
+        db.prepare(
+          'UPDATE paddocks SET animal_count = animal_count + 1 WHERE id = ?'
+        ).run(nextPaddockId);
+      }
+
+      return db.prepare('SELECT * FROM animals WHERE id = ?').get(result.lastInsertRowid);
+    });
+
+    return res.status(201).json(animal);
+  } catch (error) {
+    return sendWriteError(res, error, 'Unable to create animal');
   }
-
-  const result = db.prepare(
-    'INSERT INTO animals (name, tag_number, breed, date_of_birth, paddock_id) VALUES (?, ?, ?, ?, ?)'
-  ).run(name, tag_number, breed ?? null, date_of_birth ?? null, paddock_id ?? null);
-
-  const animal = db.prepare('SELECT * FROM animals WHERE id = ?').get(result.lastInsertRowid);
-  res.json(animal);
 });
 
 router.get('/:id', (req, res) => {
@@ -70,35 +117,42 @@ router.put('/:id', (req, res) => {
     paddock_id:    'paddock_id' in req.body ? req.body.paddock_id : animal.paddock_id,
   };
 
-  if (updates.paddock_id !== animal.paddock_id) {
-    if (updates.paddock_id) {
-      const paddock = db.prepare('SELECT id FROM paddocks WHERE id = ?').get(updates.paddock_id);
-      if (!paddock) {
-        return res.status(404).json({ error: 'Paddock not found' });
+  try {
+    const updated = runInTransaction(() => {
+      if (updates.paddock_id !== animal.paddock_id && updates.paddock_id !== null) {
+        const paddock = db.prepare('SELECT id FROM paddocks WHERE id = ?').get(updates.paddock_id);
+        if (!paddock) {
+          throw createHttpError(404, 'Paddock not found');
+        }
       }
-    }
 
-    if (animal.paddock_id) {
-      db.prepare(
-        'UPDATE paddocks SET animal_count = animal_count - 1 WHERE id = ?'
-      ).run(animal.paddock_id);
-    }
+      db.prepare(`
+        UPDATE animals
+        SET name = ?, tag_number = ?, breed = ?, date_of_birth = ?, paddock_id = ?
+        WHERE id = ?
+      `).run(updates.name, updates.tag_number, updates.breed, updates.date_of_birth, updates.paddock_id, req.params.id);
 
-    if (updates.paddock_id) {
-      db.prepare(
-        'UPDATE paddocks SET animal_count = animal_count + 1 WHERE id = ?'
-      ).run(updates.paddock_id);
-    }
+      if (updates.paddock_id !== animal.paddock_id) {
+        if (animal.paddock_id !== null) {
+          db.prepare(
+            'UPDATE paddocks SET animal_count = animal_count - 1 WHERE id = ?'
+          ).run(animal.paddock_id);
+        }
+
+        if (updates.paddock_id !== null) {
+          db.prepare(
+            'UPDATE paddocks SET animal_count = animal_count + 1 WHERE id = ?'
+          ).run(updates.paddock_id);
+        }
+      }
+
+      return db.prepare('SELECT * FROM animals WHERE id = ?').get(req.params.id);
+    });
+
+    return res.json(updated);
+  } catch (error) {
+    return sendWriteError(res, error, 'Unable to update animal');
   }
-
-  db.prepare(`
-    UPDATE animals
-    SET name = ?, tag_number = ?, breed = ?, date_of_birth = ?, paddock_id = ?
-    WHERE id = ?
-  `).run(updates.name, updates.tag_number, updates.breed, updates.date_of_birth, updates.paddock_id, req.params.id);
-
-  const updated = db.prepare('SELECT * FROM animals WHERE id = ?').get(req.params.id);
-  res.json(updated);
 });
 
 router.delete('/:id', (req, res) => {
