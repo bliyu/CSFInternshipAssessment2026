@@ -17,11 +17,15 @@ npm start
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+If Windows PowerShell blocks `npm` script execution, use `npm.cmd install`, `npm.cmd test`, and `npm.cmd start` instead.
+
 Useful pages:
 
 - `http://localhost:3000/`
 - `http://localhost:3000/animals.html`
-- `http://localhost:3000/animal-detail.html?id=1`
+- `http://localhost:3000/animal-detail.html?id=1` (health events and weight history)
+
+To reset the local sample data at any point, run `node seed.js` again from `backend/`.
 
 ## Running tests
 
@@ -84,3 +88,5 @@ Weight API validation rules:
 - `weight_kg` must be a positive number
 - `date` is required
 - requests for unknown animals return `404`
+
+SQLite database files are generated locally during development and are intentionally not tracked in git.

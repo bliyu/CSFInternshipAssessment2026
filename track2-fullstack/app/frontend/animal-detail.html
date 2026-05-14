@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Animal — FarmTracker</title>
+  <title>Animal - FarmTracker</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -15,8 +15,9 @@
     </nav>
   </header>
   <main>
-    <a href="animals.html" class="back-link">← Back to Animals</a>
-    <div id="animal-detail"><p class="loading">Loading…</p></div>
+    <a href="animals.html" class="back-link">&larr; Back to Animals</a>
+    <p id="page-feedback" class="page-feedback" hidden></p>
+    <div id="animal-detail"><p class="loading">Loading...</p></div>
 
     <section id="health-section" style="display:none">
       <h3>Health Events</h3>
@@ -42,6 +43,7 @@
         <label>Notes <input type="text" name="notes" placeholder="Optional"></label>
         <button type="submit">Log Event</button>
       </form>
+      <p id="event-feedback" class="form-feedback" hidden></p>
     </section>
 
     <section id="weights-section" style="display:none">
@@ -63,44 +65,101 @@
         <label>Notes <input type="text" name="notes" placeholder="Optional"></label>
         <button type="submit">Log Weight</button>
       </form>
+      <p id="weight-feedback" class="form-feedback" hidden></p>
     </section>
   </main>
   <script src="app.js"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
     const animalId = params.get('id');
+    const pageFeedback = document.getElementById('page-feedback');
+
+    function formatDate(dateValue) {
+      if (!dateValue) return '-';
+
+      const parsedDate = new Date(`${dateValue}T00:00:00`);
+      if (Number.isNaN(parsedDate.getTime())) {
+        return dateValue;
+      }
+
+      return new Intl.DateTimeFormat('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      }).format(parsedDate);
+    }
+
+    function setFeedback(id, message, tone) {
+      const element = document.getElementById(id);
+
+      if (!message) {
+        element.hidden = true;
+        element.textContent = '';
+        element.className = 'form-feedback';
+        return;
+      }
+
+      element.hidden = false;
+      element.textContent = message;
+      element.className = `form-feedback ${tone}`;
+    }
+
+    function setPageFeedback(message) {
+      if (!message) {
+        pageFeedback.hidden = true;
+        pageFeedback.textContent = '';
+        return;
+      }
+
+      pageFeedback.hidden = false;
+      pageFeedback.textContent = message;
+    }
 
     async function load() {
-      const animal = await api.get(`/animals/${animalId}`);
+      if (!animalId) {
+        document.getElementById('animal-detail').innerHTML = '';
+        setPageFeedback('Animal id is missing from the page URL.');
+        return;
+      }
 
-      document.title = `${animal.name} — FarmTracker`;
-      document.getElementById('animal-detail').innerHTML = `
-        <div class="animal-header">
-          <h2>${animal.name}<span class="tag">${animal.tag_number}</span></h2>
-        </div>
-        <dl>
-          <dt>Breed</dt>       <dd>${animal.breed ?? '—'}</dd>
-          <dt>Date of Birth</dt><dd>${animal.date_of_birth ?? '—'}</dd>
-          <dt>Paddock</dt>     <dd>${animal.paddock_id ?? 'Unassigned'}</dd>
-        </dl>
-      `;
+      try {
+        setPageFeedback('');
+        const animal = await api.get(`/animals/${animalId}`);
 
-      document.getElementById('health-section').style.display = 'block';
-      document.getElementById('weights-section').style.display = 'block';
-      await loadEvents();
-      await loadWeights();
+        document.title = `${animal.name} - FarmTracker`;
+        document.getElementById('animal-detail').innerHTML = `
+          <div class="animal-header">
+            <h2>${animal.name}<span class="tag">${animal.tag_number}</span></h2>
+          </div>
+          <dl>
+            <dt>Breed</dt>       <dd>${animal.breed ?? '-'}</dd>
+            <dt>Date of Birth</dt><dd>${animal.date_of_birth ? formatDate(animal.date_of_birth) : '-'}</dd>
+            <dt>Paddock</dt>     <dd>${animal.paddock_id ?? 'Unassigned'}</dd>
+          </dl>
+        `;
+
+        document.getElementById('health-section').style.display = 'block';
+        document.getElementById('weights-section').style.display = 'block';
+        await loadEvents();
+        await loadWeights();
+      } catch (error) {
+        document.getElementById('animal-detail').innerHTML = '';
+        document.getElementById('health-section').style.display = 'none';
+        document.getElementById('weights-section').style.display = 'none';
+        setPageFeedback(error.message || 'Unable to load this animal right now.');
+      }
     }
 
     async function loadEvents() {
       const events = await api.get(`/animals/${animalId}/health-events`);
       const tbody = document.getElementById('events-body');
       tbody.innerHTML = events.length
-        ? events.map(e => `
+        ? events.map(event => `
             <tr>
-              <td>${e.date}</td>
-              <td>${e.event_type}</td>
-              <td>${e.vet_name ?? '—'}</td>
-              <td>${e.notes ?? '—'}</td>
+              <td>${formatDate(event.date)}</td>
+              <td>${event.event_type}</td>
+              <td>${event.vet_name ?? '-'}</td>
+              <td>${event.notes ?? '-'}</td>
             </tr>
           `).join('')
         : '<tr><td colspan="4" class="empty">No events recorded.</td></tr>';
@@ -112,7 +171,7 @@
       const tbody = document.getElementById('weights-body');
 
       latestWeight.textContent = weights.length
-        ? `Latest: ${weights[0].weight_kg} kg on ${weights[0].date}`
+        ? `Latest: ${weights[0].weight_kg} kg on ${formatDate(weights[0].date)}`
         : 'No weights recorded.';
 
       latestWeight.className = weights.length ? '' : 'empty';
@@ -120,7 +179,7 @@
       tbody.innerHTML = weights.length
         ? weights.map(weight => `
             <tr>
-              <td>${weight.date}</td>
+              <td>${formatDate(weight.date)}</td>
               <td>${weight.weight_kg}</td>
               <td>${weight.notes ?? '-'}</td>
             </tr>
@@ -128,22 +187,36 @@
         : '<tr><td colspan="3" class="empty">No weights recorded.</td></tr>';
     }
 
-    document.getElementById('event-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const data = Object.fromEntries(new FormData(e.target));
-      await api.post(`/animals/${animalId}/health-events`, data);
-      e.target.reset();
-      await loadEvents();
+    document.getElementById('event-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      try {
+        setFeedback('event-feedback', '', '');
+        const data = Object.fromEntries(new FormData(event.target));
+        await api.post(`/animals/${animalId}/health-events`, data);
+        event.target.reset();
+        await loadEvents();
+        setFeedback('event-feedback', 'Health event saved.', 'success');
+      } catch (error) {
+        setFeedback('event-feedback', error.message || 'Unable to save the health event.', 'error');
+      }
     });
 
-    document.getElementById('weight-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const formData = new FormData(e.target);
-      const data = Object.fromEntries(formData);
-      data.weight_kg = Number(data.weight_kg);
-      await api.post(`/animals/${animalId}/weights`, data);
-      e.target.reset();
-      await loadWeights();
+    document.getElementById('weight-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      try {
+        setFeedback('weight-feedback', '', '');
+        const formData = new FormData(event.target);
+        const data = Object.fromEntries(formData);
+        data.weight_kg = Number(data.weight_kg);
+        await api.post(`/animals/${animalId}/weights`, data);
+        event.target.reset();
+        await loadWeights();
+        setFeedback('weight-feedback', 'Weight entry saved.', 'success');
+      } catch (error) {
+        setFeedback('weight-feedback', error.message || 'Unable to save the weight entry.', 'error');
+      }
     });
 
     load();

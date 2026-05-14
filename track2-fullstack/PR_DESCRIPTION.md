@@ -12,8 +12,10 @@ This pull request completes the FarmTracker Fullstack assessment scope by:
 
 - auditing the inherited application and documenting priorities in `AUDIT.md`
 - fixing a paddock count consistency bug when animals move between paddocks
+- fixing animal list pagination so page-based navigation no longer overlaps records between pages
 - implementing the full weight logging feature from `TODO.md` across the backend and frontend
 - adding the frontend Weight History section to the animal detail page
+- improving the animal detail experience with readable date formatting and inline success/error feedback
 - documenting the main architectural concern and a concrete next-step plan
 - adding a short retrospective on trade-offs and follow-up work
 
@@ -48,6 +50,8 @@ I also called out inconsistent validation and the growing concentration of busin
 ### Bug Fix
 
 - Updated `PUT /api/animals/:id` so moving an animal between paddocks decrements the old paddock count and increments the new paddock count only when the paddock assignment actually changes.
+- Corrected `GET /api/animals` pagination so `page` behaves as a page index rather than a raw database row offset.
+- Added a missing-paddock guard when creating or moving animals so invalid paddock references return `404` instead of causing inconsistent state.
 
 ### Weight Tracking API
 
@@ -57,13 +61,15 @@ I also called out inconsistent validation and the growing concentration of busin
 - Added validation so `weight_kg` must be present, numeric, and positive, and `date` must be present.
 - Returns `404` when the animal does not exist and `422` for invalid weight input.
 - Added integration tests covering success, validation failures, missing animal handling, and descending date ordering.
+- Added coverage for the missing-paddock validation path on animal creation.
 
 ### Frontend
 
 - Added a Weight History section to `animal-detail.html`.
-- Displays the latest recorded weight prominently.
+- Displays the latest recorded weight prominently with a human-readable date.
 - Lists all weight entries in a table.
 - Adds a form to submit new weight records and reload the history after save.
+- Shows inline success and error feedback for health-event and weight submissions.
 
 ## TODO Acceptance Criteria Coverage
 
@@ -89,6 +95,8 @@ node seed.js
 npm start
 ```
 
+If Windows PowerShell blocks `npm` script execution, use `npm.cmd install`, `npm.cmd test`, and `npm.cmd start`.
+
 Open:
 
 - `http://localhost:3000`
@@ -105,16 +113,17 @@ npm test
 
 Observed result:
 
-- `11/11` tests passing with the backend integration suite
+- `14/14` tests passing with the backend integration suite
 
 ## Trade-Offs
 
 - I kept the code changes tightly scoped instead of doing a larger backend refactor.
 - I left the current stack in place because it is appropriate for the assessment and easy to review.
 - I kept the frontend styling aligned with the existing page structure rather than introducing broader UI changes.
+- I added lightweight UX polish and reviewer-friendly feedback without introducing a separate frontend framework or client-side state layer.
 
 ## What I'd Do Next
 
 - Move animal business rules out of the route file and into a service layer.
 - Wrap multi-step state changes such as paddock reassignment in explicit database transactions.
-- Add lightweight frontend error feedback for failed weight submissions.
+- Add frontend tests around the animal detail workflow if the app grows beyond its current static-HTML scope.
